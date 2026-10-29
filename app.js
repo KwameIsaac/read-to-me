@@ -112,6 +112,7 @@ engine.onChapterEnd = () => {
 
 // --- Voices ---
 function populateVoices() {
+  if (engine.backend !== "native") return;
   const voices = speechSynthesis.getVoices();
   const select = $("#voiceSelect");
   select.innerHTML = "";
@@ -129,10 +130,36 @@ function populateVoices() {
     engine.voice = voices[0];
   }
 }
-speechSynthesis.onvoiceschanged = populateVoices;
-populateVoices();
+
+function setupFallbackVoiceUI() {
+  const select = $("#voiceSelect");
+  select.innerHTML = "";
+  const opt = document.createElement("option");
+  opt.textContent = "Basic voice (fallback engine)";
+  select.appendChild(opt);
+  select.disabled = true;
+}
+
+// Native and meSpeak need different startup sequences, and meSpeak loads
+// a script + voice file over the network, so this is async. Controls that
+// depend on TTS are wired up only after we know which backend we have.
+initTTSBackend()
+  .then((backend) => {
+    if (backend === "native") {
+      populateVoices();
+      speechSynthesis.onvoiceschanged = populateVoices;
+    } else {
+      setupFallbackVoiceUI();
+      showToast("Using a basic built-in voice — your browser doesn't support higher-quality voices.", 4000);
+    }
+  })
+  .catch((err) => {
+    console.error(err);
+    showToast("Couldn't start the speech engine: " + err.message, 5000);
+  });
 
 $("#voiceSelect").addEventListener("change", (e) => {
+  if (engine.backend !== "native") return;
   const voices = speechSynthesis.getVoices();
   engine.voice = voices[e.target.value];
   localStorage.setItem("preferredVoiceIndex", e.target.value);

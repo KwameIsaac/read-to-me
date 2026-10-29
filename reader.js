@@ -1,4 +1,50 @@
-// reader.js — sentence splitting + Web Speech API playback engine
+// reader.js — sentence splitting + TTS playback engine
+//
+// Some browsers (seen on Huawei Browser, which lacks Google services and
+// therefore has no system TTS engine registered) have NO `speechSynthesis`
+// global at all — referencing it throws ReferenceError and crashes the
+// whole script. So TTS is split into two backends, chosen at runtime:
+//   - "native": the real Web Speech API (better voices, used when present)
+//   - "mespeak": meSpeak.js, a 100% pure-JS/WASM-free TTS engine (eSpeak
+//     ported to JS) loaded from CDN on demand — works even with no native
+//     TTS support at all, just with a more robotic voice.
+// Nothing in this file may reference `speechSynthesis` or
+// `SpeechSynthesisUtterance` outside of the "native" branches below.
+
+const TTS_HAS_NATIVE = (typeof window !== "undefined") &&
+  !!window.speechSynthesis && !!window.SpeechSynthesisUtterance;
+
+const MESPEAK_JS_URL = "vendor/mespeak/mespeak.js";
+const MESPEAK_VOICE_URL = "vendor/mespeak/voices/en/en-us.json";
+
+let _mespeakReadyPromise = null;
+function loadMeSpeak() {
+  if (_mespeakReadyPromise) return _mespeakReadyPromise;
+  _mespeakReadyPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = MESPEAK_JS_URL;
+    script.onload = () => {
+      try {
+        window.meSpeak.loadVoice(MESPEAK_VOICE_URL, (success) => {
+          if (success) resolve();
+          else reject(new Error("meSpeak voice failed to load"));
+        });
+      } catch (err) {
+        reject(err);
+      }
+    };
+    script.onerror = () => reject(new Error("Couldn't load the fallback speech engine (meSpeak) — check your internet connection."));
+    document.head.appendChild(script);
+  });
+  return _mespeakReadyPromise;
+}
+
+// Call once at app start. Resolves when whichever backend is available
+// is ready to speak. Never throws past this point for TTS-support reasons.
+function initTTSBackend() {
+  if (TTS_HAS_NATIVE) return Promise.resolve("native");
+  return loadMeSpeak().then(() => "mespeak");
+}
 
 function splitIntoSentences(text) {
   // Naive sentence splitter: good enough for TTS pacing, not perfect grammar.
@@ -13,11 +59,13 @@ class ReaderEngine {
     this.sentences = [];
     this.isPlaying = false;
     this.rate = 1.0;
-    this.voice = null;
+    this.voice = null; // native SpeechSynthesisVoice, when backend === "native"
+    this.backend = TTS_HAS_NATIVE ? "native" : "mespeak";
     this.onSentenceChange = null;
     this.onChapterEnd = null;
     this.onStateChange = null;
     this._keepAliveTimer = null;
+    this._meSpeakId = null;
   }
 
   loadChapter(book, chapterIndex, startSentence = 0) {
@@ -34,6 +82,16 @@ class ReaderEngine {
       this._handleChapterEnd();
       return;
     }
+    if (this.onSentenceChange) this.onSentenceChange(idx);
+
+    if (this.backend === "native") {
+      this._speakCurrentNative(idx);
+    } else {
+      this._speakCurrentMeSpeak(idx);
+    }
+  }
+
+  _speakCurrentNative(idx) {
     const utter = new SpeechSynthesisUtterance(this.sentences[idx]);
     utter.rate = this.rate;
     if (this.voice) utter.voice = this.voice;
@@ -42,7 +100,6 @@ class ReaderEngine {
       if (!this.isPlaying) return; // paused/stopped mid-utterance
       this.book.sentenceIndex++;
       this._persist();
-      if (this.onSentenceChange) this.onSentenceChange(this.book.sentenceIndex);
       this._speakCurrent();
     };
     utter.onerror = () => {
@@ -54,7 +111,20 @@ class ReaderEngine {
 
     speechSynthesis.cancel();
     speechSynthesis.speak(utter);
-    if (this.onSentenceChange) this.onSentenceChange(idx);
+  }
+
+  _speakCurrentMeSpeak(idx) {
+    // meSpeak speed: ~80 (slow) .. 390 (fast) words/min, default ~175.
+    const speed = Math.round(175 * this.rate);
+    this._meSpeakId = window.meSpeak.speak(this.sentences[idx], {
+      speed: Math.max(80, Math.min(390, speed)),
+      amplitude: 100
+    }, (success) => {
+      if (!this.isPlaying) return; // paused/stopped mid-utterance
+      this.book.sentenceIndex++;
+      this._persist();
+      this._speakCurrent();
+    });
   }
 
   _handleChapterEnd() {
@@ -71,7 +141,11 @@ class ReaderEngine {
 
   pause() {
     this.isPlaying = false;
-    speechSynthesis.cancel();
+    if (this.backend === "native") {
+      speechSynthesis.cancel();
+    } else if (window.meSpeak) {
+      window.meSpeak.stop(this._meSpeakId || undefined);
+    }
     this._stopKeepAlive();
     if (this.onStateChange) this.onStateChange(false);
   }
@@ -83,7 +157,11 @@ class ReaderEngine {
 
   skipSentence(delta) {
     const wasPlaying = this.isPlaying;
-    speechSynthesis.cancel();
+    if (this.backend === "native") {
+      speechSynthesis.cancel();
+    } else if (window.meSpeak) {
+      window.meSpeak.stop(this._meSpeakId || undefined);
+    }
     this.book.sentenceIndex = Math.max(0, Math.min(this.sentences.length - 1, this.book.sentenceIndex + delta));
     this._persist();
     if (this.onSentenceChange) this.onSentenceChange(this.book.sentenceIndex);
@@ -96,7 +174,9 @@ class ReaderEngine {
 
   // Chrome/Edge pause speechSynthesis after ~15s of inactivity on some
   // platforms; nudging it keeps long-form reading from silently dying.
+  // (Not needed for the meSpeak backend.)
   _startKeepAlive() {
+    if (this.backend !== "native") return;
     this._stopKeepAlive();
     this._keepAliveTimer = setInterval(() => {
       if (speechSynthesis.speaking && !speechSynthesis.paused) {
