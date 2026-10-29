@@ -93,7 +93,7 @@ async function parseEpubFile(file) {
 
 async function parsePdfFile(file) {
   const buf = await file.arrayBuffer();
-  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.worker.min.js";
+  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
   const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
 
   let fullText = "";

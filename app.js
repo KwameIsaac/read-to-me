@@ -180,7 +180,9 @@ $("#deleteBookBtn").addEventListener("click", async () => {
 });
 
 // --- Adding books ---
-$("#addBookBtn").addEventListener("click", () => fileInput.click());
+// The "+ Add Book" control is a native <label for="fileInput">, so the
+// browser opens the file picker itself — no JS click-forwarding needed
+// (more reliable across mobile browsers/webviews than input.click()).
 
 fileInput.addEventListener("change", async (e) => {
   const files = Array.from(e.target.files || []);
