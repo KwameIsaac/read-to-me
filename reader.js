@@ -133,6 +133,15 @@ class ReaderEngine {
   }
 
   play() {
+    // Mobile browsers only allow audio to start inside a direct user
+    // gesture. meSpeak tries to self-unlock on touchstart/mousedown, but
+    // its mobile/Safari detection misses Huawei Browser entirely, so the
+    // audio context stays suspended forever unless we unlock it here —
+    // play() is always called synchronously from the Play button's own
+    // click handler, so this still counts as "inside the gesture".
+    if (this.backend === "mespeak" && window.meSpeak && window.meSpeak.unlockAudio) {
+      try { window.meSpeak.unlockAudio({}); } catch (e) { /* best-effort */ }
+    }
     this.isPlaying = true;
     this._startKeepAlive();
     this._speakCurrent();
