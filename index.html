@@ -7,6 +7,42 @@
 <link rel="manifest" href="manifest.json" />
 <meta name="theme-color" content="#1b1b1f" />
 <link rel="stylesheet" href="style.css" />
+<script>
+// Global error banner — deliberately plain, old-style JS (var, function
+// declarations, no arrow/template/optional-chaining syntax) so it keeps
+// working and shows a real error message even if a newer-syntax bug in
+// one of the other files breaks silently on an older browser engine.
+window.addEventListener("error", function (e) {
+  showAppErrorBanner((e && e.message) || "Unknown script error");
+});
+window.addEventListener("unhandledrejection", function (e) {
+  var reason = e && e.reason;
+  var msg = (reason && reason.message) ? reason.message : String(reason);
+  showAppErrorBanner(msg);
+});
+function showAppErrorBanner(msg) {
+  var existing = document.getElementById("appErrorBanner");
+  if (existing) { existing.textContent = "App error: " + msg; return; }
+  var div = document.createElement("div");
+  div.id = "appErrorBanner";
+  div.textContent = "App error: " + msg;
+  div.style.position = "fixed";
+  div.style.top = "0";
+  div.style.left = "0";
+  div.style.right = "0";
+  div.style.background = "#b00020";
+  div.style.color = "#fff";
+  div.style.padding = "10px 14px";
+  div.style.fontFamily = "sans-serif";
+  div.style.fontSize = "13px";
+  div.style.zIndex = "99999";
+  div.style.wordBreak = "break-word";
+  document.addEventListener("DOMContentLoaded", function () {
+    document.body.insertBefore(div, document.body.firstChild);
+  });
+  if (document.body) document.body.insertBefore(div, document.body.firstChild);
+}
+</script>
 </head>
 <body>
 

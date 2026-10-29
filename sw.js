@@ -6,7 +6,7 @@
 // until every tab is fully closed — the old SW keeps serving its old
 // cached copies of index.html/app.js/etc forever. That caused a real
 // "fix shipped but the user's phone still runs the broken version" bug.
-const CACHE = "read-to-me-v3";
+const CACHE = "read-to-me-v4";
 const ASSETS = ["./", "index.html", "style.css", "db.js", "parsers.js", "reader.js", "app.js", "manifest.json", "icon.svg"];
 
 self.addEventListener("install", (e) => {

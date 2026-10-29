@@ -62,8 +62,23 @@ async function parseEpubFile(file) {
   const opfXml = await zip.file(opfPath).async("string");
   const opfDoc = new DOMParser().parseFromString(opfXml, "application/xml");
 
-  const title = opfDoc.querySelector("metadata > *|title, metadata > title")?.textContent || file.name.replace(/\.[^.]+$/, "");
-  const author = opfDoc.querySelector("metadata > *|creator, metadata > creator")?.textContent || "";
+  // Avoid CSS namespace-wildcard selectors ("*|title") and optional
+  // chaining (?.) here — some mobile browser engines (seen on Huawei
+  // Browser) either throw on that selector syntax or fail to parse the
+  // whole file on "?.", which silently breaks the entire import pipeline.
+  function firstTextByLocalName(doc, localName) {
+    const els = doc.getElementsByTagName("*");
+    for (let i = 0; i < els.length; i++) {
+      const el = els[i];
+      const name = el.localName || el.nodeName;
+      if (name && name.toLowerCase() === localName && el.textContent) {
+        return el.textContent;
+      }
+    }
+    return null;
+  }
+  const title = firstTextByLocalName(opfDoc, "title") || file.name.replace(/\.[^.]+$/, "");
+  const author = firstTextByLocalName(opfDoc, "creator") || "";
 
   const manifestItems = {};
   opfDoc.querySelectorAll("manifest item").forEach(item => {

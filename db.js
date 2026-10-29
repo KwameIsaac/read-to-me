@@ -5,15 +5,35 @@ const STORE = "books";
 
 function openDB() {
   return new Promise((resolve, reject) => {
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    if (!window.indexedDB) {
+      reject(new Error("This browser doesn't support local storage (IndexedDB) — try a different browser."));
+      return;
+    }
+    // Some mobile browsers (notably in certain privacy modes) leave the
+    // open() request permanently pending instead of erroring, so a plain
+    // await here hangs forever with zero feedback. A hard timeout turns
+    // that silent hang into a message the user can actually act on.
+    const timeout = setTimeout(() => {
+      reject(new Error("Local storage (IndexedDB) didn't respond in time — your browser may be blocking site storage. Check privacy/incognito settings."));
+    }, 6000);
+
+    let req;
+    try {
+      req = indexedDB.open(DB_NAME, DB_VERSION);
+    } catch (err) {
+      clearTimeout(timeout);
+      reject(err);
+      return;
+    }
     req.onupgradeneeded = (e) => {
       const db = e.target.result;
       if (!db.objectStoreNames.contains(STORE)) {
         db.createObjectStore(STORE, { keyPath: "id" });
       }
     };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onsuccess = () => { clearTimeout(timeout); resolve(req.result); };
+    req.onerror = () => { clearTimeout(timeout); reject(req.error || new Error("IndexedDB open failed")); };
+    req.onblocked = () => { clearTimeout(timeout); reject(new Error("IndexedDB open was blocked (another tab may be using an older version).")); };
   });
 }
 
