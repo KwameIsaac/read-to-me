@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Read To Me — Book Reader</title>
+<link rel="manifest" href="manifest.json" />
+<meta name="theme-color" content="#1b1b1f" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+<header class="topbar">
+  <h1>📖 Read To Me</h1>
+  <button id="addBookBtn" class="btn primary">+ Add Book</button>
+  <input type="file" id="fileInput" accept=".epub,.pdf,.txt" multiple hidden />
+</header>
+
+<main id="libraryView" class="view">
+  <div id="libraryEmpty" class="empty-state">
+    <p>No books yet. Add an EPUB, PDF, or TXT file to get started.</p>
+  </div>
+  <div id="libraryGrid" class="library-grid"></div>
+</main>
+
+<main id="readerView" class="view hidden">
+  <div class="reader-toolbar">
+    <button id="backToLibraryBtn" class="btn ghost">← Library</button>
+    <div class="reader-title">
+      <strong id="readerBookTitle">Title</strong>
+      <span id="readerChapterLabel">Section 1</span>
+    </div>
+    <button id="deleteBookBtn" class="btn danger ghost">Delete</button>
+  </div>
+
+  <div id="readerText" class="reader-text"></div>
+
+  <div class="player-bar">
+    <div class="player-row">
+      <button id="prevChapterBtn" class="icon-btn" title="Previous section">⏮</button>
+      <button id="prevSentenceBtn" class="icon-btn" title="Back">⏪</button>
+      <button id="playPauseBtn" class="icon-btn big" title="Play/Pause">▶️</button>
+      <button id="nextSentenceBtn" class="icon-btn" title="Forward">⏩</button>
+      <button id="nextChapterBtn" class="icon-btn" title="Next section">⏭</button>
+    </div>
+    <div class="player-row controls-row">
+      <label>Voice
+        <select id="voiceSelect"></select>
+      </label>
+      <label>Speed <span id="rateLabel">1.0x</span>
+        <input type="range" id="rateSlider" min="0.5" max="2" step="0.1" value="1" />
+      </label>
+    </div>
+    <div class="progress-wrap">
+      <div id="progressBar" class="progress-bar"></div>
+    </div>
+  </div>
+</main>
+
+<div id="toast" class="toast hidden"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.0.379/pdf.min.js"></script>
+<script src="db.js"></script>
+<script src="parsers.js"></script>
+<script src="reader.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
